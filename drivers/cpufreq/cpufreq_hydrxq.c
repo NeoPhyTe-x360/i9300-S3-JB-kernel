@@ -31,9 +31,7 @@
 #include <linux/timer.h>
 #include <linux/workqueue.h>
 #include <linux/kthread.h>
-#include <linux/earlysuspend.h>
 #include <asm/cputime.h>
-#include <linux/suspend.h>
 #include <linux/slab.h>
 
 //a hack to make comparisons easier while having different structs in pegasusq and hydrxq
@@ -41,10 +39,10 @@
 #define dvfs_workqueue dvfs_hydrq_workqueue
 
 #define HYDRX_VERSION	(2)
-#define HYDRX_AUTHOR	"neophyte-x360"
+#define HYDRX_AUTHOR	"tegrak"
 
 // if you changed some codes for optimization, just write your name here.
-#define HYDRX_TUNER "gokhanmoral-robertobsc"
+#define HYDRX_TUNER "gokhanmoral-robertobsc-neophytex360"
 
 static atomic_t active_count = ATOMIC_INIT(0);
 
@@ -138,7 +136,7 @@ static unsigned long dec_cpu_load;
  * Increasing frequency table index
  * zero disables and causes to always jump straight to max frequency.
  */
-#define DEFAULT_PUMP_UP_STEP 3
+#define DEFAULT_PUMP_UP_STEP 2
 static unsigned long pump_up_step;
 
 /*
@@ -153,15 +151,6 @@ static unsigned long timer_rate;
  */
 #define DEFAULT_PUMP_DOWN_STEP 1
 static unsigned long pump_down_step;
-
-/*
- * Use minimum frequency while suspended.
- */
-static unsigned int early_suspended;
-
-#define SCREEN_OFF_LOWEST_STEP 		(0xffffffff)
-#define DEFAULT_SCREEN_OFF_MIN_STEP	(SCREEN_OFF_LOWEST_STEP)
-static unsigned long screen_off_min_step;
 
 
 /*
@@ -294,8 +283,8 @@ static unsigned int get_nr_run_avg(void)
 #define DEF_MAX_CPU_LOCK			(0)
 #define DEF_MIN_CPU_LOCK			(0)
 #define DEF_UP_NR_CPUS				(1)
-#define DEF_CPU_UP_RATE				(13)
-#define DEF_CPU_DOWN_RATE			(13)
+#define DEF_CPU_UP_RATE				(20)
+#define DEF_CPU_DOWN_RATE			(10)
 #define DEF_START_DELAY				(0)
 
 #define HOTPLUG_DOWN_INDEX			(0)
@@ -309,7 +298,7 @@ static int hotplug_rq[4][2] = {
 static int hotplug_freq[4][2] = {
 	{0, 500000},
 	{200000, 500000},
-	{400000, 800000},
+	{1400000, 800000},
 	{500000, 0}
 };
 #else
@@ -318,10 +307,10 @@ static int hotplug_rq[4][2] = {
 };
 
 static int hotplug_freq[4][2] = {
-	{0, 600000},
-	{400000, 700000},
+	{0, 700000},
 	{500000, 800000},
-	{600000, 0}
+	{600000, 900000},
+	{700000, 0}
 };
 #endif
 
@@ -364,8 +353,6 @@ static struct dbs_tuners {
 	.hotplug_lock = ATOMIC_INIT(0),
 	.dvfs_debug = 0,
 	.ignore_nice = 0,
-#ifdef CONFIG_HAS_EARLYSUSPEND
-#endif
 };
 
 static unsigned int get_hydrfreq_table_size(struct cpufreq_hydrx_cpuinfo *pcpu) {
@@ -380,39 +367,6 @@ static unsigned int get_hydrfreq_table_size(struct cpufreq_hydrx_cpuinfo *pcpu) 
 	pcpu->hydrfreq_table[size].index = 0;
 	pcpu->hydrfreq_table[size].frequency = CPUFREQ_TABLE_END;
 	return size;
-}
-
-static inline void fix_screen_off_min_step(struct cpufreq_hydrx_cpuinfo *pcpu) {
-	if (pcpu->hydrfreq_table_size <= 0) {
-		screen_off_min_step = 0;
-		return;
-	}
-	
-	if (DEFAULT_SCREEN_OFF_MIN_STEP == screen_off_min_step) 
-		for(screen_off_min_step=0;
-		pcpu->hydrfreq_table[screen_off_min_step].frequency != 200000;
-		screen_off_min_step++);
-	
-	if (screen_off_min_step >= pcpu->hydrfreq_table_size)
-		for(screen_off_min_step=0;
-		pcpu->hydrfreq_table[screen_off_min_step].frequency != 200000;
-		screen_off_min_step++);
-}
-
-static inline unsigned int adjust_screen_off_freq(
-	struct cpufreq_hydrx_cpuinfo *pcpu, unsigned int freq) {
-	
-	if (early_suspended && freq > pcpu->hydrfreq_table[screen_off_min_step].frequency) {		
-		freq = pcpu->hydrfreq_table[screen_off_min_step].frequency;
-		pcpu->target_freq = pcpu->policy->cur;
-		
-		if (freq > pcpu->policy->max)
-			freq = pcpu->policy->max;
-		if (freq < pcpu->policy->min)
-			freq = pcpu->policy->min;
-	}
-	
-	return freq;
 }
 
 static void cpufreq_hydrx_timer(unsigned long data)
@@ -648,12 +602,6 @@ static void cpufreq_hydrx_timer(unsigned long data)
 	}
 	new_freq = pcpu->hydrfreq_table[index].frequency;
 
-	// adjust freq when screen off
-	new_freq = adjust_screen_off_freq(pcpu, new_freq);
-	
-	if (pcpu->target_freq == new_freq)
-		goto rearm_if_notmax;
-
 	/*
 	 * Do not scale down unless we have been at this frequency for the
 	 * minimum sample time.
@@ -704,11 +652,6 @@ static void cpufreq_hydrx_timer(unsigned long data)
 		wake_up_process(up_task);
 	}
 
-rearm_if_notmax:
-
-	if (dbs_tuners_ins.dvfs_debug) {
-		printk (KERN_ERR "HydrQ: cpu %lu, rearm_if_notmax\n", data);
-	}
 	/*
 	 * Already set max speed and don't see a need to change that,
 	 * wait until next idle to re-evaluate, don't need timer.
@@ -1150,34 +1093,6 @@ static ssize_t store_pump_down_step(struct kobject *kobj,
 static struct global_attr pump_down_step_attr = __ATTR(pump_down_step, 0666,
 		show_pump_down_step, store_pump_down_step);
 
-// screen_off_min_step
-static ssize_t show_screen_off_min_step(struct kobject *kobj,
-				     struct attribute *attr, char *buf)
-{
-	struct cpufreq_hydrx_cpuinfo *pcpu;
-	
-	pcpu = &per_cpu(cpuinfo, 0);
-	fix_screen_off_min_step(pcpu);
-	
-	return sprintf(buf, "%lu\n", screen_off_min_step);
-}
-
-static ssize_t store_screen_off_min_step(struct kobject *kobj,
-			struct attribute *attr, const char *buf, size_t count)
-{
-	struct cpufreq_hydrx_cpuinfo *pcpu;
-	
-	if(strict_strtoul(buf, 0, &screen_off_min_step)==-EINVAL) return -EINVAL;
-	
-	pcpu = &per_cpu(cpuinfo, 0);
-	fix_screen_off_min_step(pcpu);
-
-	return count;
-}
-
-static struct global_attr screen_off_min_step_attr = __ATTR(screen_off_min_step, 0666,
-		show_screen_off_min_step, store_screen_off_min_step);
-
 // author
 static ssize_t show_author(struct kobject *kobj,
 				     struct attribute *attr, char *buf)
@@ -1614,7 +1529,6 @@ static struct attribute *hydrx_attributes[] = {
 	&down_sample_time_attr.attr,
 	&pump_up_step_attr.attr,
 	&pump_down_step_attr.attr,
-	&screen_off_min_step_attr.attr,
 	&debug_mode_attr.attr,
 	&ignore_nice_load.attr,
 
@@ -1952,7 +1866,6 @@ static int cpufreq_governor_hydrx(struct cpufreq_policy *policy,
 			pcpu->hydrfreq_table_size = get_hydrfreq_table_size(pcpu);
 
 			// fix invalid screen_off_min_step
-			fix_screen_off_min_step(pcpu);
 			if (dbs_tuners_ins.ignore_nice) {
 				pcpu->freq_change_prev_cpu_nice =
 					kstat_cpu(j).cpustat.nice;
@@ -2046,20 +1959,6 @@ static struct notifier_block cpufreq_hydrx_idle_nb = {
 	.notifier_call = cpufreq_hydrx_idle_notifier,
 };
 
-static void hydrx_early_suspend(struct early_suspend *handler) {
-	early_suspended = 1;
-}
-
-static void hydrx_late_resume(struct early_suspend *handler) {
-	early_suspended = 0;
-}
-
-static struct early_suspend hydrx_power_suspend = {
-	.suspend = hydrx_early_suspend,
-	.resume = hydrx_late_resume,
-	.level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 1,
-};
-
 void start_hydrxq(void)
 {
 	//it is more appropriate to start the up_task thread after starting the governor -gm
@@ -2096,7 +1995,6 @@ void start_hydrxq(void)
 	get_task_struct(up_task);
 
 	idle_notifier_register(&cpufreq_hydrx_idle_nb);
-	register_early_suspend(&hydrx_power_suspend);
 }
 
 void stop_hydrxq(void)
@@ -2106,7 +2004,6 @@ void stop_hydrxq(void)
 	put_task_struct(up_task);
 
 	idle_notifier_unregister(&cpufreq_hydrx_idle_nb);
-	unregister_early_suspend(&hydrx_power_suspend);
 	pump_up_step = DEFAULT_PUMP_UP_STEP;
 	pump_down_step = DEFAULT_PUMP_DOWN_STEP;
 }
@@ -2121,8 +2018,6 @@ static int __init cpufreq_hydrx_init(void)
 	dec_cpu_load = DEFAULT_DEC_CPU_LOAD;
 	pump_up_step = DEFAULT_PUMP_UP_STEP;
 	pump_down_step = DEFAULT_PUMP_DOWN_STEP;
-	early_suspended = 0;
-	screen_off_min_step = DEFAULT_SCREEN_OFF_MIN_STEP;
 	timer_rate = DEFAULT_TIMER_RATE;
 	ret = init_rq_avg();
 	if(ret) return ret;

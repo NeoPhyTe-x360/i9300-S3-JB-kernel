@@ -83,6 +83,7 @@ deps_config := \
 	fs/ext3/Kconfig \
 	fs/ext2/Kconfig \
 	fs/Kconfig \
+	drivers/j4fs/Kconfig \
 	drivers/interceptor/Kconfig \
 	drivers/felica/Kconfig \
 	drivers/iommu/Kconfig \
@@ -103,6 +104,7 @@ deps_config := \
 	drivers/clk/Kconfig \
 	drivers/platform/x86/Kconfig \
 	drivers/platform/Kconfig \
+	drivers/staging/cpupower/Kconfig \
 	drivers/staging/nvec/Kconfig \
 	drivers/staging/mei/Kconfig \
 	drivers/staging/altera-stapl/Kconfig \
@@ -528,6 +530,7 @@ deps_config := \
 	drivers/scsi/libsas/Kconfig \
 	drivers/scsi/Kconfig \
 	drivers/ide/Kconfig \
+	drivers/misc/modem_if_na_spr/Kconfig \
 	drivers/misc/modem_if_na/Kconfig \
 	drivers/misc/modem_if/Kconfig \
 	drivers/misc/c2c/Kconfig \
@@ -667,6 +670,7 @@ deps_config := \
 	drivers/sh/intc/Kconfig \
 	drivers/sh/Kconfig \
 	arch/arm/mach-shmobile/Kconfig \
+	arch/arm/mach-exynos/Kconfig.slp \
 	arch/arm/mach-exynos/Kconfig.local \
 	arch/arm/mach-exynos/Kconfig \
 	arch/arm/mach-s5pv210/Kconfig \
@@ -744,7 +748,7 @@ deps_config := \
 include/config/auto.conf: \
 	$(deps_config)
 
-ifneq "$(KERNELVERSION)" "3.0.56"
+ifneq "$(KERNELVERSION)" "3.0.58"
 include/config/auto.conf: FORCE
 endif
 ifneq "$(ARCH)" "arm"

@@ -51,7 +51,7 @@ enum row_queue_prio {
 static const bool queue_idling_enabled[] = {
 	true,	/* ROWQ_PRIO_HIGH_READ */
 	true,	/* ROWQ_PRIO_REG_READ */
-	true,	/* ROWQ_PRIO_HIGH_SWRITE */
+	false,	/* ROWQ_PRIO_HIGH_SWRITE */
 	false,	/* ROWQ_PRIO_REG_SWRITE */
 	false,	/* ROWQ_PRIO_REG_WRITE */
 	true,	/* ROWQ_PRIO_LOW_READ */
@@ -60,12 +60,12 @@ static const bool queue_idling_enabled[] = {
 
 /* Default values for row queues quantums in each dispatch cycle */
 static const int queue_quantum[] = {
-	60,	/* ROWQ_PRIO_HIGH_READ */
-	60,	/* ROWQ_PRIO_REG_READ */
+	70,	/* ROWQ_PRIO_HIGH_READ */
+	70,	/* ROWQ_PRIO_REG_READ */
 	20,	/* ROWQ_PRIO_HIGH_SWRITE */
 	1,	/* ROWQ_PRIO_REG_SWRITE */
 	1,	/* ROWQ_PRIO_REG_WRITE */
-	40,	/* ROWQ_PRIO_LOW_READ */
+	30,	/* ROWQ_PRIO_LOW_READ */
 	1	/* ROWQ_PRIO_LOW_SWRITE */
 };
 

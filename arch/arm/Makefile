@@ -17,7 +17,7 @@ endif
 
 OBJCOPYFLAGS	:=-O binary -R .comment -S
 GZFLAGS		:=-9
-#KBUILD_CFLAGS	+=-pipe
+KBUILD_CFLAGS	+=-pipe
 # Explicitly specifiy 32-bit ARM ISA since toolchain default can be -mthumb:
 KBUILD_CFLAGS	+=$(call cc-option,-marm,)
 
@@ -99,6 +99,10 @@ endif
 
 ifeq ($(CONFIG_ARM_UNWIND),y)
 CFLAGS_ABI	+=-funwind-tables
+endif
+
+ifeq ($(CONFIG_ALIGNMENT_TRAP),y)
+CFLAGS_ABI	+=$(call cc-option,-mno-unaligned-access,)
 endif
 
 ifeq ($(CONFIG_THUMB2_KERNEL),y)
@@ -253,7 +257,6 @@ core-$(CONFIG_VMWARE_MVP)	+= arch/arm/mvp/
 
 # If we have a machine-specific directory, then include it in the build.
 core-y				+= arch/arm/kernel/ arch/arm/mm/ arch/arm/common/
-core-y				+= arch/arm/net/
 core-y				+= $(machdirs) $(platdirs)
 
 drivers-$(CONFIG_OPROFILE)      += arch/arm/oprofile/

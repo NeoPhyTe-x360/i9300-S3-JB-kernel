@@ -28,7 +28,7 @@ static const int sync_write_expire = HZ;	/* max time before a sync write is subm
 static const int async_read_expire  = HZ / 4;	/* ditto for async, these limits are SOFT! */
 static const int async_write_expire = HZ;	/* ditto for async, these limits are SOFT! */
 
-static const int writes_starved = 4;		/* max times reads can starve a write */
+static const int writes_starved = 2;		/* max times reads can starve a write */
 static const int fifo_batch     = 1;		/* # of sequential requests treated as one
 						   by the above parameters. For throughput. */
 /* Elevator data */

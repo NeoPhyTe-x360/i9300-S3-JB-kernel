@@ -646,12 +646,9 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
 	if (!data)
 		target_timeout = cmd->cmd_timeout_ms * 1000;
 	else {
-		/* patch added for divide by zero once issue. */
-		if (host && host->clock)
-			target_timeout = data->timeout_ns / 1000 +
-				data->timeout_clks / host->clock;
-		else
-			return 0;
+		target_timeout = data->timeout_ns / 1000;
+		if (host->clock)
+			target_timeout += data->timeout_clks / host->clock;
 	}
 
 	if (host->quirks & SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK)
@@ -2358,7 +2355,10 @@ EXPORT_SYMBOL_GPL(sdhci_suspend_host);
 
 void sdhci_shutdown_host(struct sdhci_host *host)
 {
-	sdhci_disable_card_detection(host);
+	u32 irqs = 0xFFFF;
+
+	/* all interrupt has to be masked */
+	sdhci_mask_irqs(host, irqs);
 
 	free_irq(host->irq, host);
 
@@ -2370,9 +2370,7 @@ void sdhci_shutdown_host(struct sdhci_host *host)
 #endif
 			regulator_disable(host->vmmc);
 			pr_info("%s : MMC Card OFF\n", __func__);
-#if defined(CONFIG_TARGET_LOCALE_KOR)
 			mdelay(5);
-#endif
 		}
 	}
 }

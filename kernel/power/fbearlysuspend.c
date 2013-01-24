@@ -13,6 +13,7 @@
  *
  */
 
+#include <linux/delay.h>
 #include <linux/earlysuspend.h>
 #include <linux/module.h>
 #include <linux/wait.h>
@@ -33,6 +34,8 @@ static void stop_drawing_early_suspend(struct early_suspend *h)
 	int ret;
 	unsigned long irq_flags;
 
+	  msleep(100);
+
 	spin_lock_irqsave(&fb_state_lock, irq_flags);
 	fb_state = FB_STATE_REQUEST_STOP_DRAWING;
 	spin_unlock_irqrestore(&fb_state_lock, irq_flags);
@@ -40,7 +43,7 @@ static void stop_drawing_early_suspend(struct early_suspend *h)
 	wake_up_all(&fb_state_wq);
 	ret = wait_event_timeout(fb_state_wq,
 				 fb_state == FB_STATE_STOPPED_DRAWING,
-				 HZ);
+				 HZ * 2);
 	if (unlikely(fb_state != FB_STATE_STOPPED_DRAWING))
 		pr_warning("stop_drawing_early_suspend: timeout waiting for "
 			   "userspace to stop drawing\n");
